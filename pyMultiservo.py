@@ -66,7 +66,7 @@ class MULTISERVO(object):
 
     # Additional constants
     def writeMicroseconds(self, pin, pulse_width, address=I2C_DEFAULT_ADDRESS, retryAttempts=ATTEMPTS_DEFAULT):
-        while (errorCode && --retryAttempts):
+        while (errorCode and --retryAttempts):
             self._i2c.beginTransmission(address)
             self._i2c.write(pin)
             self._i2c.write(pulse_width >> 8)
@@ -76,15 +76,15 @@ class MULTISERVO(object):
         return
 
     def attach(self, pin, min_pulse=PULSE_MIN_DEFAULT, max_pulse=PULSE_MAX_DEFAULT):
-        if (pin < 0 || pin >= self.PIN_MAX):
+        if (pin < 0 or pin >= self.PIN_MAX):
             self.detach()
             return BAD_PIN
 
-        if (minPulse < 0 || minPulse >= self.PULSE_MAX_ABSOLUTE):
+        if (minPulse < 0 or minPulse >= self.PULSE_MAX_ABSOLUTE):
             detach()
             return BAD_PULSE
 
-        if (maxPulse < 0 || maxPulse >= self.PULSE_MAX_ABSOLUTE):
+        if (maxPulse < 0 or maxPulse >= self.PULSE_MAX_ABSOLUTE):
             detach()
             return BAD_PULSE
 
