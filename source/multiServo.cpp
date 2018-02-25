@@ -7,7 +7,7 @@ const unsigned int  Multiservo::AddressDefault   = 0x47;
 const unsigned int  Multiservo::PulseMinDefault  = 490;
 const unsigned int  Multiservo::PulseMaxDefault  = 2400;
 const unsigned int  Multiservo::nAttemptsDefault = 4;
-const unsigned char Mulßtiservo::PinInvalid       = 0xFF;
+const unsigned char Multiservo::PinInvalid       = 0xFF;
 const unsigned int  Multiservo::nPinMax          = 18;
 const unsigned int  Multiservo::PulseMaxAbsolute = 19000;
 
@@ -35,11 +35,6 @@ Multiservo::Error Multiservo::writeMicroseconds
 
 
 
-
-
-
-
-
 Multiservo::Multiservo() :
   m_pulseWidth(0),
   m_twiAddress(AddressDefault),
@@ -55,6 +50,12 @@ Multiservo::Multiservo(uint8_t twiAddress) :
 {
   Wire.begin();
 }
+
+
+
+
+
+
 
 Multiservo::Error Multiservo::attach(int pin) {
   attach(pin, Multiservo::PulseMinDefault, Multiservo::PulseMaxDefault);
