@@ -52,11 +52,6 @@ Multiservo::Multiservo(uint8_t twiAddress) :
 }
 
 
-
-
-
-
-
 Multiservo::Error Multiservo::attach(int pin) {
   attach(pin, Multiservo::PulseMinDefault, Multiservo::PulseMaxDefault);
 }
