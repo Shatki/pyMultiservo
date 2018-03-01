@@ -2,7 +2,7 @@
 #   Библиотека для управления Multiservo на Paspberru Pi
 #   pyMultiservo
 #   Автор Seliverstov Dmitriy shatki@mail.ru
-import smbus
+import wiringpi as wp
 from enum import Enum
 
 
@@ -18,6 +18,7 @@ class MULTISERVO(object):
 
     # Default
     I2C_DEFAULT_ADDRESS = 0x47
+    I2C_DEFAULT_PORT = '1'
     # I2C_IDENTITY = 0xD3
     PULSE_MIN_DEFAULT = 490
     PULSE_MAX_DEFAULT = 2400
@@ -67,15 +68,13 @@ class MULTISERVO(object):
         except:
             return 0
 
-    def __init__(self, port=1, address=I2C_DEFAULT_ADDRESS):
+    def __init__(self, port=DEVICE_PREFIX.format(I2C_DEFAULT_PORT), address=I2C_DEFAULT_ADDRESS):
         # Setup I2C interface
         # Подключаемся к шине I2C
-        #port = self.DEVICE_PREFIX.format(self.)
-        if not port:
-            port = self._get_pi_i2c_bus_number()
-
-        self._i2c = smbus.SMBus(port)
+        self._i2c = wp.I2C()
+        self._io = self._i2c.setupInterface(port, address)
         self._twi_address = address
+        #self._gpioexp.write_byte(self._addr, GPIO_EXPANDER_RESET)
 
     # Additional constants
     def _write_microseconds(self, pin, pulse_width, retryAttempts=ATTEMPTS_DEFAULT):
@@ -91,13 +90,13 @@ class MULTISERVO(object):
          """
         errorCode = 0
         while (errorCode or retryAttempts):
-            self._i2c.write_byte_data(self._twi_address, 0, pin)
-            self._i2c.write_byte_data(self._twi_address, 0, pulse_width >> 8)
-            self._i2c.write_byte_data(self._twi_address, 0, pulse_width or 0xFF)
+            self._i2c.write_byte(self._twi_address, pin)
+            self._i2c.write_byte(self._twi_address, pulse_width >> 8)
+            self._i2c.write_byte(self._twi_address, pulse_width or 0xFF)
             # Читаем ошибку из шины сразу после передачи
-            errorCode = self._i2c.read_byte_data(self._twi_address, 0)
-            self._i2c.close()
-            retryAttempts=-1
+            errorCode = self._i2c.read_byte(self._twi_address)
+            # self._i2c.close()
+            retryAttempts =- 1
         return errorCode
 
     def write_microseconds(self, pulse_width):
