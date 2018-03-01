@@ -63,14 +63,16 @@ class MULTISERVO(object):
             with open('/proc/cpuinfo', 'r') as f:
                 for line in f:
                     if line.startswith('Revision'):
-                        return '1'
+                        return 1
         except:
-            return '0'
+            return 0
 
     def __init__(self, port=1, address=I2C_DEFAULT_ADDRESS):
         # Setup I2C interface
         # Подключаемся к шине I2C
-        port = self.DEVICE_PREFIX.format(self._get_pi_i2c_bus_number())
+        #port = self.DEVICE_PREFIX.format(self.)
+        if not port:
+            port = self._get_pi_i2c_bus_number()
         self._i2c = smbus.SMBus(port)
         self._twi_address = address
 
