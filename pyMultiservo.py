@@ -73,6 +73,7 @@ class MULTISERVO(object):
         #port = self.DEVICE_PREFIX.format(self.)
         if not port:
             port = self._get_pi_i2c_bus_number()
+
         self._i2c = smbus.SMBus(port)
         self._twi_address = address
 
@@ -90,12 +91,12 @@ class MULTISERVO(object):
          """
         errorCode = 0
         while (errorCode or retryAttempts):
-            self._i2c.write_byte_data(self._twi_address, pin)
-            self._i2c.write_byte_data(self._twi_address, pulse_width >> 8)
-            self._i2c.write_byte_data(self._twi_address, pulse_width & 0xFF)
+            self._i2c.write_byte_data(self._twi_address, 0, pin)
+            self._i2c.write_byte_data(self._twi_address, 0, pulse_width >> 8)
+            self._i2c.write_byte_data(self._twi_address, 0, pulse_width or 0xFF)
             # Читаем ошибку из шины сразу после передачи
-            errorCode = self._i2c.read_byte_data(self._twi_address)
-            self._i2c.close(self._twi_address)
+            errorCode = self._i2c.read_byte_data(self._twi_address, 0)
+            self._i2c.close()
             retryAttempts=-1
         return errorCode
 
@@ -176,7 +177,6 @@ class MULTISERVO(object):
         :return: Возвращается логическая истина, 
         если переменная была присоединена к какому-либо пину, или ложь в обратном случае.
         """
-        print('attached ', self._iPin != self.PIN_INVALID)
         return self._iPin != self.PIN_INVALID
 
     def detach(self):
