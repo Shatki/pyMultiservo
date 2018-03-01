@@ -8,13 +8,13 @@ from enum import Enum
 
 class MULTISERVO(object):
     class Error(Enum):
-        OK                      = 0,
-        DATA_TOO_LONG           = 1,
-        NACK_ON_ADDRESS         = 2,
-        NACK_ON_DATA            = 3,
-        TWI_ERROR               = 4,
-        BAD_PIN                 = 5,
-        BAD_PULSE               = 6,
+        OK = 0,
+        DATA_TOO_LONG = 1,
+        NACK_ON_ADDRESS = 2,
+        NACK_ON_DATA = 3,
+        TWI_ERROR = 4,
+        BAD_PIN = 5,
+        BAD_PULSE = 6
 
     # Default
     I2C_DEFAULT_ADDRESS = 0x47
@@ -67,9 +67,10 @@ class MULTISERVO(object):
         except:
             return '0'
 
-    def __init__(self, address=I2C_DEFAULT_ADDRESS, port=DEVICE_PREFIX.format(_get_pi_i2c_bus_number())):
+    def __init__(self, address=I2C_DEFAULT_ADDRESS):
         # Setup I2C interface
         # Подключаемся к шине I2C
+        port = self.DEVICE_PREFIX.format(self._get_pi_i2c_bus_number())
         self._i2c = wp.I2C()
         self._io = self._i2c.setupInterface(port, address)
 
@@ -103,7 +104,7 @@ class MULTISERVO(object):
          :param pulse_width: длина импульса в микросекундах
          :return: Код ошибки или 0 если ОK
          """
-        if self.attached():
+        if not self.attached():
             return self.Error.BAD_PIN
         pulse_width = self._constrain(pulse_width, self._min_pulse, self._max_pulse)
 
@@ -172,6 +173,7 @@ class MULTISERVO(object):
         :return: Возвращается логическая истина, 
         если переменная была присоединена к какому-либо пину, или ложь в обратном случае.
         """
+        print('attached ', self._iPin != self.PIN_INVALID)
         return self._iPin != self.PIN_INVALID
 
     def detach(self):
