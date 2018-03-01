@@ -89,14 +89,15 @@ class MULTISERVO(object):
          :return: 
          """
         errorCode = 0
-        while (errorCode or retryAttempts):
-            self._i2c.write_byte(self._twi_address, pin)
-            self._i2c.write_byte(self._twi_address, pulse_width >> 8)
-            self._i2c.write_byte(self._twi_address, pulse_width or 0xFF)
+        while (errorCode==0 or retryAttempts>0):
+            self._i2c.write(self._twi_address, pin)
+            self._i2c.write(self._twi_address, pulse_width >> 8)
+            self._i2c.write(self._twi_address, pulse_width or 0xFF)
             # Читаем ошибку из шины сразу после передачи
-            errorCode = self._i2c.read_byte(self._twi_address)
+            errorCode = self._i2c.read(self._twi_address)
             # self._i2c.close()
-            retryAttempts =- 1
+            print(errorCode, retryAttempts)
+            retryAttempts-=1
         return errorCode
 
     def write_microseconds(self, pulse_width):
