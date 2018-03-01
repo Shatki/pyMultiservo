@@ -29,7 +29,6 @@ Multiservo::Error Multiservo::writeMicroseconds
         Wire.write(pulseWidth & 0xFF);
         errorCode = (Error)Wire.endTransmission();
     } while (errorCode && --retryAttempts);
-
     return errorCode;
 }
 

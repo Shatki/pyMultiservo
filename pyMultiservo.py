@@ -6,17 +6,15 @@ import wiringpi as wp
 from enum import Enum
 
 
-
-
 class MULTISERVO(object):
     class Error(Enum):
-        OK                      =  0,
-        DATA_TOO_LONG           = 'Data too long',
-        NACK_ON_ADDRESS         = 'Nack on address',
-        NACK_ON_DATA            = 'Nack on data',
-        TWI_ERROR               = 'I2C error',
-        BAD_PIN                 = 'Bad pin',
-        BAD_PULSE               = 'Bad pulse',
+        OK                      = 0,
+        DATA_TOO_LONG           = 1,
+        NACK_ON_ADDRESS         = 2,
+        NACK_ON_DATA            = 3,
+        TWI_ERROR               = 4,
+        BAD_PIN                 = 5,
+        BAD_PULSE               = 6,
 
     # Default
     I2C_DEFAULT_ADDRESS = 0x47
@@ -29,21 +27,13 @@ class MULTISERVO(object):
     ATTEMPTS_DEFAULT = 4
     PIN_INVALID = 0xFF
     PIN_MAX = 18
+    DEVICE_PREFIX = '/dev/i2c-{}'
 
-    _twiAddress = I2C_DEFAULT_ADDRESS
-    _pulseWidth = 0
+    _twi_address = I2C_DEFAULT_ADDRESS
+    _pulse_width = 0
     _iPin = PIN_INVALID
-    _minPilse = 0
-    _maxPulse = 0
-
-
-
-    def __init__(self, address=I2C_DEFAULT_ADDRESS):
-        # Setup I2C interface
-        wp.wiringPiSetup()
-        self._i2c = wp.I2C()
-        self._io = self._i2c.setupInterface('/dev/i2c-' + str(self.getPiI2CBusNumber()), address)
-#        self._gpioexp.write_byte(self._addr, GPIO_EXPANDER_RESET)
+    _min_pulse = 0
+    _max_pulse = 0
 
     @staticmethod
     def _map(x, in_min, in_max, out_min, out_max):
@@ -63,7 +53,7 @@ class MULTISERVO(object):
         return result
 
     @staticmethod
-    def _getPiI2CBusNumber():
+    def _get_pi_i2c_bus_number():
         """
         Returns the I2C bus number (/dev/i2c-#) for the Raspberry Pi being used.
         Courtesy quick2wire-python-api
@@ -73,51 +63,56 @@ class MULTISERVO(object):
             with open('/proc/cpuinfo', 'r') as f:
                 for line in f:
                     if line.startswith('Revision'):
-                        return 1
+                        return '1'
         except:
-            return 0
+            return '0'
 
-    @staticmethod
+    def __init__(self, address=I2C_DEFAULT_ADDRESS, port=DEVICE_PREFIX.format(_get_pi_i2c_bus_number())):
+        # Setup I2C interface
+        # Подключаемся к шине I2C
+        self._i2c = wp.I2C()
+        self._io = self._i2c.setupInterface(port, address)
+
     # Additional constants
-    def _write_microseconds(pin, pulse_width, address=I2C_DEFAULT_ADDRESS, retryAttempts=ATTEMPTS_DEFAULT):
+    def _write_microseconds(self, pin, pulse_width, address=I2C_DEFAULT_ADDRESS, retryAttempts=ATTEMPTS_DEFAULT):
         """
          Отдаёт команду послать на сервоприводимульс определённой длины, 
          является низкоуровневым аналогом предыдущей команды. 
-         Синтаксис следующий: servo.writeMicroseconds(-----), где uS — длина импульса в микросекундах.
+         Синтаксис следующий: servo.write_microseconds(-----), где uS — длина импульса в микросекундах.
          :param pin: 
          :param pulse_width: 
          :param address: 
          :param retryAttempts: 
          :return: 
          """
-        while (errorCode and --retryAttempts):
-            self._i2c.write(self._io, pin)
-            _i2c.write(self._io, pulse_width)
-            # self._i2c.write(pin)
-            # self._i2c.write(pulse_width >> 8)
-            # self._i2c.write(pulse_width & 0xFF)
-            # errorCode = (Error)
-            # self._i2c.endTransmission()
+        errorCode = 0
+        while (errorCode or retryAttempts):
+            self._i2c.write(pin)
+            self._i2c.write(pulse_width >> 8)
+            self._i2c.write(pulse_width & 0xFF)
+            # Читаем ошибку из шины сразу после передачи
+            errorCode = self._i2c.read()
+            retryAttempts=-1
         return errorCode
 
     def write_microseconds(self, pulse_width):
         """
          Отдаёт команду послать на сервоприводимульс определённой длины, 
          является низкоуровневым аналогом предыдущей команды. 
-         Синтаксис следующий: servo.writeMicroseconds(pulse_width)
+         Синтаксис следующий: servo.write_microseconds(pulse_width)
          :param pulse_width: длина импульса в микросекундах
          :return: Код ошибки или 0 если ОK
          """
         if self.attached():
             return self.Error.BAD_PIN
-        pulseWidth = self._constrain(pulse_width, self._minPilse, self._maxPulse)
+        pulse_width = self._constrain(pulse_width, self._min_pulse, self._max_pulse)
 
-        if(pulseWidth == self._pulseWidth):
+        if(pulse_width == self._pulse_width):
             return self.Error.OK
 
-        self._pulseWidth = pulseWidth
+        self._pulse_width = pulse_width
 
-        return self._write_microseconds(self._iPin, self._pulseWidth, self._twiAddress, self.ATTEMPTS_DEFAULT)
+        return self._write_microseconds(self._iPin, self._pulse_width, self._twi_address, self.ATTEMPTS_DEFAULT)
 
     def attach(self, pin, min_pulse=PULSE_MIN_DEFAULT, max_pulse=PULSE_MAX_DEFAULT):
         """
@@ -143,8 +138,8 @@ class MULTISERVO(object):
             return self.Error.BAD_PULSE
 
         self._iPin = pin
-        self._minPulse = min_pulse
-        self._maxPulse = max_pulse
+        self._min_pulse = min_pulse
+        self._max_pulse = max_pulse
         return self.Error.OK
 
     def write(self, value):
@@ -154,12 +149,12 @@ class MULTISERVO(object):
         :return: Код ошибки или 0 если ОK
         """
         # Если значение меньше минимального импульса, то значение указано в градусах
-        if value < self._minPilse:
+        if value < self._min_pulse:
             # стабилизируем значение с диапазоне с 0 до 180 градусов
             value = self._constrain(value, self.ANGLE_MIN_DEFAULT, self.ANGLE_MAX_DEFAULT)
             # конвертируем в значение импульса
-            value = self._map(value, self.ANGLE_MIN_DEFAULT, self.ANGLE_MAX_DEFAULT, self._minPilse, self._maxPulse)
-        return self.writeMicroseconds(value)
+            value = self._map(value, self.ANGLE_MIN_DEFAULT, self.ANGLE_MAX_DEFAULT, self._min_pulse, self._max_pulse)
+        return self.write_microseconds(value)
 
     def read(self):
         """
@@ -167,8 +162,8 @@ class MULTISERVO(object):
         Синтаксис следующий: servo.read() 
         :return: возвращается целое значение от 0 до 180
         """
-        return self._map(self._pulseWidth, self._minPilse,
-                         self._maxPulse, self.ANGLE_MIN_DEFAULT, self.ANGLE_MAX_DEFAULT)
+        return self._map(self._pulse_width, self._min_pulse,
+                         self._max_pulse, self.ANGLE_MIN_DEFAULT, self.ANGLE_MAX_DEFAULT)
 
     def attached(self):
         """
@@ -188,7 +183,7 @@ class MULTISERVO(object):
         """
         if not self.attached():
             return self.Error.OK
-        err = self._writeMicroseconds(self._iPin, 0, self._twiAddress, self.ATTEMPTS_DEFAULT)
+        err = self._write_microseconds(self._iPin, 0, self._twi_address, self.ATTEMPTS_DEFAULT)
         if err:
             self._iPin = self.PIN_INVALID
         return err
