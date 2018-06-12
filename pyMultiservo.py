@@ -90,10 +90,10 @@ class MULTISERVO(object):
         while (retry_attempts > 0):
             try:
                 self._i2c.write_word_data(self._twi_address, pin, ((pulse_width & 0xff) << 8 ^ pulse_width >> 8))
-            except:
+            except IOError as print_error_code:
                 # Error code after trying
+                print(error_code)
                 error_code = self.Error.TWI_ERROR
-                # print(pin, retryAttempts)
                 retry_attempts -= 1
         return error_code
 
