@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-#   Библиотека для управления Multiservo на Paspberru Pi
+#   Библиотека для управления Multiservo на Raspberru Pi
 #   pyMultiservo
 #   Автор Seliverstov Dmitriy shatki@mail.ru
-import wiringpi as wp
+import smbus
 from enum import Enum
 
 
@@ -18,7 +18,7 @@ class MULTISERVO(object):
 
     # Default
     I2C_DEFAULT_ADDRESS = 0x47
-    I2C_DEFAULT_PORT = '1'
+    I2C_DEFAULT_PORT = 1
     # I2C_IDENTITY = 0xD3
     PULSE_MIN_DEFAULT = 490
     PULSE_MAX_DEFAULT = 2400
@@ -68,11 +68,10 @@ class MULTISERVO(object):
         except:
             return 0
 
-    def __init__(self, port=DEVICE_PREFIX.format(I2C_DEFAULT_PORT), address=I2C_DEFAULT_ADDRESS):
+    def __init__(self, port=1, address=I2C_DEFAULT_ADDRESS):
         # Setup I2C interface
         # Подключаемся к шине I2C
-        self._i2c = wp.I2C()
-        self._io = self._i2c.setupInterface(port, address)
+        self._i2c = smbus.SMBus(port)
         self._twi_address = address
         #self._gpioexp.write_byte(self._addr, GPIO_EXPANDER_RESET)
 
@@ -89,16 +88,17 @@ class MULTISERVO(object):
          :return: 
          """
         errorCode = 0
-        while (errorCode==0 or retryAttempts>0):
-            self._i2c.write(self._twi_address, pin)
-            self._i2c.write(self._twi_address, pulse_width >> 8)
-            self._i2c.write(self._twi_address, pulse_width or 0xFF)
+        while (retryAttempts>0):
+            # data = (pin & 0xff) | ((pulse_width & 0xff)<<8)
+            #_bytes = [pin, (pulse_width >> 8) & 0xff, pulse_width & 0xff]
+            self._i2c.write_byte(self._twi_address, pin & 0xff)
+            self._i2c.write_byte(self._twi_address, (pulse_width >> 8) & 0xff)
+            self._i2c.write_byte(self._twi_address, pulse_width & 0xff)
             # Читаем ошибку из шины сразу после передачи
-            errorCode = self._i2c.read(self._twi_address)
-            # self._i2c.close()
-            print(errorCode, retryAttempts)
-            retryAttempts-=1
-        return errorCode
+            # errorCode = self._i2c.read_byte(self._twi_address)
+            print(pin, retryAttempts)
+            retryAttempts -= 1
+            # return errorCode
 
     def write_microseconds(self, pulse_width):
         """
@@ -130,6 +130,7 @@ class MULTISERVO(object):
         :param max_pulse: максимальная длина импульса в микросекундах, соответствующая углу поворота 180°
         :return: Код ошибки или 0 если ОK
         """
+        print(pin, min_pulse, max_pulse)
         if (pin < 0 or pin >= self.PIN_MAX):
             self.detach()
             return self.Error.BAD_PIN
@@ -188,9 +189,11 @@ class MULTISERVO(object):
         """
         if not self.attached():
             return self.Error.OK
-        err = self._write_microseconds(self._iPin, 0, self._twi_address, self.ATTEMPTS_DEFAULT)
+        err = self._write_microseconds(self._iPin, 0)
         if err:
             self._iPin = self.PIN_INVALID
+        else:
+            self._i2c.close()
         return err
 
 
