@@ -6,7 +6,11 @@ n = 490
 
 bus = smbus.SMBus(1)
 #bus.write_word_data(0x47, 6, 0x1EA)
-bus.write_word_data(0x47, 0x6, ((n & 0xff) << 8 ^ n >> 8))
+try:
+    bus.write_word_data(0x47, 0x6, ((n & 0xff) << 8 ^ n >> 8))
+except IOError as error_code:
+    print(error_code.args)
+
 #bus.write_byte(0x47, 0)
 #bus.write_byte(0x47, 0)
 #time.sleep(1)

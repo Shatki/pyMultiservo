@@ -76,29 +76,26 @@ class MULTISERVO(object):
         #self._gpioexp.write_byte(self._addr, GPIO_EXPANDER_RESET)
 
     # Additional constants
-    def _write_microseconds(self, pin, pulse_width, retryAttempts=ATTEMPTS_DEFAULT):
+    def _write_microseconds(self, pin, pulse_width, retry_attempts=ATTEMPTS_DEFAULT):
         """
          Отдаёт команду послать на сервоприводимульс определённой длины, 
          является низкоуровневым аналогом предыдущей команды. 
          Синтаксис следующий: servo.write_microseconds(-----), где uS — длина импульса в микросекундах.
          :param pin: 
          :param pulse_width: 
-         :param address: 
-         :param retryAttempts: 
+         :param retryAttempts:
          :return: 
          """
-        errorCode = 0
-        while (retryAttempts>0):
-            # data = (pin & 0xff) | ((pulse_width & 0xff)<<8)
-            #_bytes = [pin, (pulse_width >> 8) & 0xff, pulse_width & 0xff]
-            self._i2c.write_byte(self._twi_address, pin & 0xff)
-            self._i2c.write_byte(self._twi_address, (pulse_width >> 8) & 0xff)
-            self._i2c.write_byte(self._twi_address, pulse_width & 0xff)
-            # Читаем ошибку из шины сразу после передачи
-            # errorCode = self._i2c.read_byte(self._twi_address)
-            print(pin, retryAttempts)
-            retryAttempts -= 1
-            # return errorCode
+        error_code = self.Error.OK
+        while (retry_attempts > 0):
+            try:
+                self._i2c.write_word_data(self._twi_address, pin, ((pulse_width & 0xff) << 8 ^ pulse_width >> 8))
+            except:
+                # Error code after trying
+                error_code = self.Error.TWI_ERROR
+                # print(pin, retryAttempts)
+                retry_attempts -= 1
+        return error_code
 
     def write_microseconds(self, pulse_width):
         """
