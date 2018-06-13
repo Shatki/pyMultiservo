@@ -16,6 +16,9 @@ class MULTISERVO(object):
         BAD_PIN = 5,
         BAD_PULSE = 6
 
+    # Библиотека smbus не поддерживает прием ACK_ON_ADDRESS или ACK_ON_DATA от slave.
+    # Вместо этого библиотека прижимает линию DATA к низкому логическому уровню.
+
     # Default
     I2C_DEFAULT_ADDRESS = 0x47
     I2C_DEFAULT_PORT = 1
@@ -50,8 +53,7 @@ class MULTISERVO(object):
 
     @staticmethod
     def _reverse_uint16(data):
-        result = ((data & 0xff) << 8) | ((data >> 8) & 0xff)
-        return result
+        return (data & 0xff) << 8 ^ data >> 8
 
     @staticmethod
     def _get_pi_i2c_bus_number():
@@ -73,26 +75,25 @@ class MULTISERVO(object):
         # Подключаемся к шине I2C
         self._i2c = smbus.SMBus(port)
         self._twi_address = address
-        #self._gpioexp.write_byte(self._addr, GPIO_EXPANDER_RESET)
 
     # Additional constants
     def _write_microseconds(self, pin, pulse_width, retry_attempts=ATTEMPTS_DEFAULT):
         """
          Отдаёт команду послать на сервоприводимульс определённой длины, 
          является низкоуровневым аналогом предыдущей команды. 
-         Синтаксис следующий: servo.write_microseconds(-----), где uS — длина импульса в микросекундах.
+         Синтаксис: servo.write_microseconds(-----), где uS — длина импульса в микросекундах.
          :param pin: 
          :param pulse_width: 
-         :param retryAttempts:
+         :param retry_attempts:
          :return: 
          """
         error_code = self.Error.OK
-        while (retry_attempts > 0):
+        while retry_attempts > 0:
             try:
-                self._i2c.write_word_data(self._twi_address, pin, ((pulse_width & 0xff) << 8 ^ pulse_width >> 8))
-            except IOError as print_error_code:
-                # Error code after trying
-                print(error_code)
+                self._i2c.write_word_data(self._twi_address, pin, self._reverse_uint16(pulse_width))
+            except:
+                # IOError
+                # EREMOTEIO 121 Remote I/O error
                 error_code = self.Error.TWI_ERROR
                 retry_attempts -= 1
         return error_code
@@ -101,7 +102,7 @@ class MULTISERVO(object):
         """
          Отдаёт команду послать на сервоприводимульс определённой длины, 
          является низкоуровневым аналогом предыдущей команды. 
-         Синтаксис следующий: servo.write_microseconds(pulse_width)
+         Синтаксис: servo.write_microseconds(pulse_width)
          :param pulse_width: длина импульса в микросекундах
          :return: Код ошибки или 0 если ОK
          """
@@ -109,7 +110,7 @@ class MULTISERVO(object):
             return self.Error.BAD_PIN
         pulse_width = self._constrain(pulse_width, self._min_pulse, self._max_pulse)
 
-        if(pulse_width == self._pulse_width):
+        if pulse_width == self._pulse_width:
             return self.Error.OK
 
         self._pulse_width = pulse_width
@@ -128,15 +129,15 @@ class MULTISERVO(object):
         :return: Код ошибки или 0 если ОK
         """
         print(pin, min_pulse, max_pulse)
-        if (pin < 0 or pin >= self.PIN_MAX):
+        if pin < 0 or pin >= self.PIN_MAX:
             self.detach()
             return self.Error.BAD_PIN
 
-        if (min_pulse < 0 or min_pulse >= self.PULSE_MAX_ABSOLUTE):
+        if min_pulse < 0 or min_pulse >= self.PULSE_MAX_ABSOLUTE:
             self.detach()
             return self.Error.BAD_PULSE
 
-        if (max_pulse < 0 or max_pulse >= self.PULSE_MAX_ABSOLUTE):
+        if max_pulse < 0 or max_pulse >= self.PULSE_MAX_ABSOLUTE:
             self.detach()
             return self.Error.BAD_PULSE
 
@@ -162,7 +163,7 @@ class MULTISERVO(object):
     def read(self):
         """
         Читает текущее значение угла, в котором находится сервопривод. 
-        Синтаксис следующий: servo.read() 
+        Синтаксис: servo.read() 
         :return: возвращается целое значение от 0 до 180
         """
         return self._map(self._pulse_width, self._min_pulse,
@@ -171,7 +172,7 @@ class MULTISERVO(object):
     def attached(self):
         """
         Проверка, была ли присоединена переменная к конкретному пину. 
-        Синтаксис следующий: servo.attached(), 
+        Синтаксис: servo.attached(), 
         :return: Возвращается логическая истина, 
         если переменная была присоединена к какому-либо пину, или ложь в обратном случае.
         """
@@ -181,7 +182,7 @@ class MULTISERVO(object):
         """
         Производит действие, обратное действию attach(), 
         то есть отсоединяет переменную от пина, к которому она была приписана. 
-        Синтаксис следующий: servo.detach()
+        Синтаксис: servo.detach()
         :return: Код ошибки или 0 если ОK
         """
         if not self.attached():
