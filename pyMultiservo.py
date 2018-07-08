@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-#   Библиотека для управления Multiservo на Raspberru Pi
+#   Библиотека для управления Multiservo на Raspberry Pi
 #   pyMultiservo
 #   Автор Seliverstov Dmitriy shatki@mail.ru
 import smbus
@@ -16,9 +16,6 @@ class MULTISERVO(object):
         BAD_PIN = 5,
         BAD_PULSE = 6
 
-    # Библиотека smbus не поддерживает прием ACK_ON_ADDRESS или ACK_ON_DATA от slave.
-    # Вместо этого библиотека прижимает линию DATA к низкому логическому уровню.
-
     # Default
     I2C_DEFAULT_ADDRESS = 0x47
     I2C_DEFAULT_PORT = 1
@@ -33,18 +30,18 @@ class MULTISERVO(object):
     PIN_MAX = 18
     DEVICE_PREFIX = '/dev/i2c-{}'
 
-    _twi_address = I2C_DEFAULT_ADDRESS
-    _pulse_width = 0
-    _iPin = PIN_INVALID
-    _min_pulse = 0
-    _max_pulse = 0
+    __twi_address = I2C_DEFAULT_ADDRESS
+    __pulse_width = 0
+    __iPin = PIN_INVALID
+    __min_pulse = 0
+    __max_pulse = 0
 
     @staticmethod
-    def _map(x, in_min, in_max, out_min, out_max):
+    def __map(x, in_min, in_max, out_min, out_max):
         return int((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
     @staticmethod
-    def _constrain(x, a, b):
+    def __constrain(x, a, b):
         if x < a:
             return a
         elif x > b:
@@ -52,11 +49,11 @@ class MULTISERVO(object):
         return x
 
     @staticmethod
-    def _reverse_uint16(data):
-        return (data & 0xff) << 8 ^ data >> 8
+    def __reverse_uint16(data):
+        result = ((data & 0xff) << 8) | ((data >> 8) & 0xff)
+        return result
 
-    @staticmethod
-    def _get_pi_i2c_bus_number():
+    def __get_pi__i2c_bus_number(self):
         """
         Returns the I2C bus number (/dev/i2c-#) for the Raspberry Pi being used.
         Courtesy quick2wire-python-api
@@ -67,21 +64,22 @@ class MULTISERVO(object):
                 for line in f:
                     if line.startswith('Revision'):
                         return 1
-        except:
-            return 0
+        except IOError:
+            return self.Error.TWI_ERROR
 
     def __init__(self, port=1, address=I2C_DEFAULT_ADDRESS):
         # Setup I2C interface
         # Подключаемся к шине I2C
-        self._i2c = smbus.SMBus(port)
-        self._twi_address = address
+        self.__i2c = smbus.SMBus(port)
+        self.__twi_address = address
+        # self._gpioexp.write_byte(self._addr, GPIO_EXPANDER_RESET)
 
     # Additional constants
-    def _write_microseconds(self, pin, pulse_width, retry_attempts=ATTEMPTS_DEFAULT):
+    def __write_microseconds(self, pin, pulse_width, retry_attempts=ATTEMPTS_DEFAULT):
         """
          Отдаёт команду послать на сервоприводимульс определённой длины, 
-         является низкоуровневым аналогом предыдущей команды. 
-         Синтаксис: servo.write_microseconds(-----), где uS — длина импульса в микросекундах.
+         является низкоуровневым аналогом предыдущей команды. Только для внутреннего использования.
+         Синтаксис следующий: servo._write_microseconds(-----), где uS — длина импульса в микросекундах.
          :param pin: 
          :param pulse_width: 
          :param retry_attempts:
@@ -90,32 +88,31 @@ class MULTISERVO(object):
         error_code = self.Error.OK
         while retry_attempts > 0:
             try:
-                self._i2c.write_word_data(self._twi_address, pin, self._reverse_uint16(pulse_width))
-            except:
-                # IOError
-                # EREMOTEIO 121 Remote I/O error
+                self.__i2c.write_word_data(self.__twi_address, pin, ((pulse_width & 0xff) << 8 ^ pulse_width >> 8))
+            except IOError:
+                # Error code after trying
+                print(error_code)
                 error_code = self.Error.TWI_ERROR
                 retry_attempts -= 1
         return error_code
 
     def write_microseconds(self, pulse_width):
         """
-         Отдаёт команду послать на сервоприводимульс определённой длины, 
-         является низкоуровневым аналогом предыдущей команды. 
-         Синтаксис: servo.write_microseconds(pulse_width)
+         Отдаёт команду послать на сервоприводимульс определённой длины. .
+         Синтаксис следующий: servo.write_microseconds(pulse_width)
          :param pulse_width: длина импульса в микросекундах
          :return: Код ошибки или 0 если ОK
          """
         if not self.attached():
             return self.Error.BAD_PIN
-        pulse_width = self._constrain(pulse_width, self._min_pulse, self._max_pulse)
+        pulse_width = self.__constrain(pulse_width, self.__min_pulse, self.__max_pulse)
 
-        if pulse_width == self._pulse_width:
+        if pulse_width == self.__pulse_width:
             return self.Error.OK
 
-        self._pulse_width = pulse_width
+        self.__pulse_width = pulse_width
 
-        return self._write_microseconds(self._iPin, self._pulse_width, self.ATTEMPTS_DEFAULT)
+        return self.__write_microseconds(self.__iPin, self.__pulse_width, self.ATTEMPTS_DEFAULT)
 
     def attach(self, pin, min_pulse=PULSE_MIN_DEFAULT, max_pulse=PULSE_MAX_DEFAULT):
         """
@@ -141,10 +138,27 @@ class MULTISERVO(object):
             self.detach()
             return self.Error.BAD_PULSE
 
-        self._iPin = pin
-        self._min_pulse = min_pulse
-        self._max_pulse = max_pulse
+        self.__iPin = pin
+        self.__min_pulse = min_pulse
+        self.__max_pulse = max_pulse
         return self.Error.OK
+
+    def detach(self):
+        """
+        Производит действие, обратное действию attach(),
+        то есть отсоединяет переменную от пина, к которому она была приписана.
+        Синтаксис следующий: servo.detach()
+        :return: Код ошибки или 0 если ОK
+        """
+        if not self.attached():
+            return self.Error.OK
+        # Возврат сервы в положение 0
+        err = self.__write_microseconds(self.__iPin, 0)
+        if err:
+            self.__iPin = self.PIN_INVALID
+        #else:
+        #    self.__i2c.close()
+        return err
 
     def write(self, value):
         """
@@ -153,48 +167,27 @@ class MULTISERVO(object):
         :return: Код ошибки или 0 если ОK
         """
         # Если значение меньше минимального импульса, то значение указано в градусах
-        if value < self._min_pulse:
+        if value < self.__min_pulse:
             # стабилизируем значение с диапазоне с 0 до 180 градусов
-            value = self._constrain(value, self.ANGLE_MIN_DEFAULT, self.ANGLE_MAX_DEFAULT)
+            value = self.__constrain(value, self.ANGLE_MIN_DEFAULT, self.ANGLE_MAX_DEFAULT)
             # конвертируем в значение импульса
-            value = self._map(value, self.ANGLE_MIN_DEFAULT, self.ANGLE_MAX_DEFAULT, self._min_pulse, self._max_pulse)
+            value = self.__map(value, self.ANGLE_MIN_DEFAULT, self.ANGLE_MAX_DEFAULT, self.__min_pulse, self.__max_pulse)
         return self.write_microseconds(value)
 
     def read(self):
         """
         Читает текущее значение угла, в котором находится сервопривод. 
-        Синтаксис: servo.read() 
+        Синтаксис следующий: servo.read() 
         :return: возвращается целое значение от 0 до 180
         """
-        return self._map(self._pulse_width, self._min_pulse,
-                         self._max_pulse, self.ANGLE_MIN_DEFAULT, self.ANGLE_MAX_DEFAULT)
+        return self.__map(self.__pulse_width, self.__min_pulse,
+                         self.__max_pulse, self.ANGLE_MIN_DEFAULT, self.ANGLE_MAX_DEFAULT)
 
     def attached(self):
         """
         Проверка, была ли присоединена переменная к конкретному пину. 
-        Синтаксис: servo.attached(), 
+        Синтаксис следующий: servo.attached(), 
         :return: Возвращается логическая истина, 
         если переменная была присоединена к какому-либо пину, или ложь в обратном случае.
         """
-        return self._iPin != self.PIN_INVALID
-
-    def detach(self):
-        """
-        Производит действие, обратное действию attach(), 
-        то есть отсоединяет переменную от пина, к которому она была приписана. 
-        Синтаксис: servo.detach()
-        :return: Код ошибки или 0 если ОK
-        """
-        if not self.attached():
-            return self.Error.OK
-        err = self._write_microseconds(self._iPin, 0)
-        if err:
-            self._iPin = self.PIN_INVALID
-        else:
-            self._i2c.close()
-        return err
-
-
-
-
-
+        return self.__iPin != self.PIN_INVALID
